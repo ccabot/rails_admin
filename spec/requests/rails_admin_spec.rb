@@ -9,9 +9,9 @@ describe "RailsAdmin" do
     RailsAdmin::AbstractModel.new("League").destroy_all!
     RailsAdmin::AbstractModel.new("Player").destroy_all!
     RailsAdmin::AbstractModel.new("Team").destroy_all!
-    RailsAdmin::AbstractModel.new("User").destroy_all!
+    User.destroy_all
 
-    user = RailsAdmin::AbstractModel.new("User").create(
+    user = User.create(
       :email => "test@test.com",
       :password => "test1234"
     )
@@ -47,7 +47,16 @@ describe "RailsAdmin" do
             navigation.should_not have_tag("li a", :content => model.to_s)
           end
         end
-      end      
+      end
+
+      it "list page should raise an error" do
+        begin
+          get rails_admin_fan_list_path
+          fail "should have raised when listing excluded class"
+        rescue
+          # this is what we want
+        end
+      end
     end
 
     describe "navigation" do
