@@ -42,8 +42,6 @@ module RailsAdmin
       @models << new(model) if model
     end
 
-    private
-
     # Given a string +model_name+, finds the corresponding model class
     def self.lookup(model_name,raise_error=true)
       begin
