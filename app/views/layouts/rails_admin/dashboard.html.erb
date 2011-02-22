@@ -5,29 +5,41 @@
   <meta name="robots" content="NONE,NOARCHIVE" />
   <title><%= @page_name %> | <%= @plugin_name %></title>
   <%= stylesheet_link_tag('rails_admin/base') %>
+  <%= stylesheet_link_tag('rails_admin/list') %>
   <%= stylesheet_link_tag('rails_admin/dashboard') %>
 
   <%= javascript_include_tag('rails_admin/prototype.js') %>
+  <%= javascript_include_tag('rails_admin/rails.js') %>
+
   <%= javascript_include_tag('rails_admin/scriptaculous.js') %>
   <%= javascript_include_tag('rails_admin/dashboard.js') %>
 
+  <%= csrf_meta_tag %>
 </head>
 <body>
-  <div id="wraper">
+  <div id="wrapper">
     <div id="header">
       <div id="headerLeft">
         <ul class="breadcrumb">
           <li>
-            <%= link_to(t('admin.dashboard.name'), rails_admin_dashboard_path) %>
+            <%= link_to(t('home.name'), root_path) %>
+          </li>
+          <li>
+            &rsaquo;
+            <span><%= t('admin.dashboard.name') %></span>
           </li>
         </ul>
-        <h1><%= @plugin_name %></h1>
+        <h1 id="logo">
+          <%= link_to rails_admin_dashboard_path do %>
+            <span class="image_replacement"><%= @plugin_name %></span>
+          <% end -%>
+        </h1>
       </div>
 
 <%= render(:partial => 'rails_admin/main/navigation') %>
 
       <div id="headerRight">
-<%= render(:partial => 'rails_admin/main/user_info', :locals => {:current_user => current_user}) %>
+<%= render(:partial => 'rails_admin/main/user_info', :locals => {:current_user => _current_user}) %>
       </div>
     </div>
 

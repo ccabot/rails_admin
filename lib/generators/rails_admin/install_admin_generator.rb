@@ -1,6 +1,7 @@
 module RailsAdmin
   class InstallAdminGenerator < Rails::Generators::Base
-    source_root File.expand_path("../templates", __FILE__)
+    source_root File.expand_path('../templates', __FILE__)
+    argument :model_name, :type => :string, :default => 'user'
 
     desc "RailsAdmin Install"
 
@@ -8,10 +9,7 @@ module RailsAdmin
       puts "Hello!
 Rails_admin works with devise. Checking for a current installation of devise!
 "
-      loaded_gems = Bundler.setup.gems
-      is_loaded = loaded_gems.reject{|t| t.name == "devise" ? false : true}.size == 1 ? true : false
-
-      if is_loaded
+      if defined?(Devise)
         check_for_devise_models
       else
         puts "Please put gem 'devise' into your Gemfile"
@@ -64,7 +62,7 @@ Rails_admin works with devise. Checking for a current installation of devise!
     def set_devise
       puts "Setting up devise for you!
 ======================================================"
-      invoke 'devise', ['user']
+      invoke 'devise', [model_name]
     end
 
     def copy_locales_files

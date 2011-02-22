@@ -20,10 +20,10 @@ document.observe("dom:loaded", function() {
       var select = elem.parentNode.parentNode.childElements()[2].childElements()[0];
       var aux = []
       var ref = select.readAttribute('ref')
-      var text = e.target.value;
+      var text = e.target.value.toLowerCase();
 
       buffer[ref].each(function(ev){
-        if(ev[0].indexOf(text)!=-1){
+        if(ev[0].toLowerCase().indexOf(text)!=-1){
           aux.push(ev)
         }
       })
@@ -41,7 +41,7 @@ document.observe("dom:loaded", function() {
   })
 
   $$(".addAssoc").each(function(elem){
-    
+
     var assocName = elem.parentNode.parentNode.childElements()[4].childElements()[0].readAttribute('name');
 
     Event.observe(elem,'click',function(e){
@@ -63,14 +63,11 @@ document.observe("dom:loaded", function() {
         }
 
       })
+
       buffer[counter] = []
       select.childElements().each(function(e){
         buffer[counter].push([e.innerHTML,e.readAttribute('value')])
       })
-
-      var hiddenElem = parentDiv.childElements()[4].childElements()[0];
-      if(!hiddenElem.value) hiddenElem.remove()
-      // remakeBuffer
     })
   })
 
@@ -98,6 +95,11 @@ document.observe("dom:loaded", function() {
               o.remove()
             }
           })
+
+          if (!hiddenFields.childElements().length) {
+            var dummyField = new Element('input', {"type": "hidden", "name": assocName})
+            hiddenFields.insert({bottom: dummyField});
+          }
         }
 
       })
@@ -106,14 +108,13 @@ document.observe("dom:loaded", function() {
       select.childElements().each(function(e){
         buffer[counter].push([e.innerHTML,e.readAttribute('value')])
       })
-      // remakeBuffer
     })
   })
 
   $$(".addAllAssoc").each(function(elem){
-      
+
     var assocName = elem.parentNode.parentNode.childElements()[4].childElements()[0].readAttribute('name');
-    
+
     Event.observe(elem,'click',function(e){
 
       var parentDiv = e.findElement('a').parentNode.parentNode;
@@ -132,13 +133,13 @@ document.observe("dom:loaded", function() {
 
       var counter = select.readAttribute("ref");
       buffer[counter] = []
-
-      var hiddenElem = parentDiv.childElements()[4].childElements()[0];
-      if(!hiddenElem.value) hiddenElem.remove()
     })
   })
 
   $$(".clearAssoc").each(function(elem){
+
+    var assocName = elem.parentNode.parentNode.childElements()[4].childElements()[0].readAttribute('name');
+
     Event.observe(elem,'click',function(e){
 
       var parentDiv = e.findElement('a').parentNode.parentNode;
@@ -155,6 +156,11 @@ document.observe("dom:loaded", function() {
       hiddenFields.childElements().each(function(ev){
         ev.remove();
       });
+
+      if (!hiddenFields.childElements().length) {
+        var dummyField = new Element('input', {"type": "hidden", "name": assocName})
+        hiddenFields.insert({bottom: dummyField});
+      }
 
       var counter = select.readAttribute("ref");
       buffer[counter] = []

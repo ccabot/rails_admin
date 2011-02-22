@@ -7,67 +7,93 @@
   <%= stylesheet_link_tag('rails_admin/create.css') %>
 
   <%= javascript_include_tag('rails_admin/prototype.js') %>
+  <%= javascript_include_tag('rails_admin/rails.js') %>
+
   <%= javascript_include_tag('rails_admin/prototype-base-extensions.js') %>
   <%= javascript_include_tag('rails_admin/prototype-date-extensions.js') %>
+  <%= javascript_include_tag('rails_admin/scriptaculous.js') %>
   <%= javascript_include_tag('rails_admin/datepicker.js') %>
   <%= javascript_include_tag('rails_admin/associations.js') %>
+  <%= javascript_include_tag('ckeditor/ckeditor.js') if File.exists?(File.join(Rails.root, 'public/javascripts/ckeditor/ckeditor.js')) %>
+  <%= javascript_include_tag('rails_admin/dashboard.js') %>
   <%= stylesheet_link_tag('rails_admin/datepicker.css') %>
+  <%= stylesheet_link_tag('rails_admin/colorpicker.css') %>
 
   <script type="text/javascript" language="javascript">
   Control.DatePicker.Locale['en_US'] = {
-    dateTimeFormat: 'dd/MM/yyyy HH:mm',
-    dateFormat: 'dd/MM/yyyy'}
+    dateTimeFormat: 'yyyy-MM-dd HH:mm',
+    dateFormat: 'yyyy-MM-dd'}
 
   document.observe("dom:loaded", function() {
-    $$(".dateField").each(function(elem){
-      new Control.DatePicker(elem, {icon: '/images/calendar.png'});
+    $$(".field .date").each(function(elem){
+      new Control.DatePicker(elem, {icon: '<%= image_tag "rails_admin/calendar.png" %>'});
     });
-    // .dateField, .timestampField, .timeField, .datetimeField
-    $$(".timestampField").each(function(elem){
-      new Control.DatePicker(elem, {icon: '/images/clock.png', timePicker: true, timePickerAdjacent: true});
+    $$(".field .timestamp").each(function(elem){
+      new Control.DatePicker(elem, {icon: '<%= image_tag "rails_admin/clock.png" %>', timePicker: true, timePickerAdjacent: true});
     });
-    $$(".timeField").each(function(elem){
-      new Control.DatePicker(elem, {icon: '/images/clock.png', timePicker: true, datePicker :false});
+    $$(".field .time").each(function(elem){
+      new Control.DatePicker(elem, {icon: '<%= image_tag "rails_admin/clock.png" %>', timePicker: true, datePicker :false});
     });
-    $$(".datetimeField").each(function(elem){
-      new Control.DatePicker(elem, {icon: '/images/calendar.png', timePicker: true, timePickerAdjacent: true});
+    $$(".field .datetime").each(function(elem){
+      new Control.DatePicker(elem, {icon: '<%= image_tag "rails_admin/calendar.png" %>', timePicker: true, timePickerAdjacent: true});
     });
+
+    <%
+    RailsAdmin::config(@object).edit.visible_groups.each do |form_section|
+      next unless form_section.visible_fields.length > 0
+      form_section.visible_fields.select { |field| field.respond_to?(:column_width) }.each do |field|
+    %>
+    $("<%= "#{field.abstract_model.to_param}_#{field.name}" %>").style.width = "<%= field.column_width%>px";
+    <%
+      end
+    end
+    %>
   });
 
   </script>
 
-  <title><%= @page_name %></title>
+  <%= csrf_meta_tag %>
 </head>
 
 <body>
-  <div id="wraper">
+  <div id="wrapper">
     <div id="header">
       <div id="headerLeft">
         <ul class="breadcrumb">
           <li>
+            <%= link_to(t('home.name'), '/') %>
+          </li>
+          <li>
+            &rsaquo;
             <%= link_to(t('admin.dashboard.name'), rails_admin_dashboard_path) %>
-            &rsaquo;
           </li>
           <li>
-            <%= link_to(@abstract_model.pretty_name, rails_admin_list_path(:model_name => @abstract_model.to_param)) %>
             &rsaquo;
+            <%= link_to(@model_config.update.label, rails_admin_list_path(:model_name => @abstract_model.to_param)) %>
           </li>
           <li>
-            <%= link_to(@page_name, rails_admin_new_path(:model_name => @abstract_model.to_param)) %>
+            &rsaquo;
+            <span><%= @page_name %></span>
           </li>
         </ul>
-        <h1><%= @plugin_name %></h1>
+        <h1 id="logo">
+          <%= link_to rails_admin_dashboard_path do %>
+            <span class="image_replacement"><%= @plugin_name %></span>
+          <% end -%>
+        </h1>
       </div>
 
 <%= render(:partial => 'rails_admin/main/navigation') %>
 
       <div id="headerRight">
-<%= render(:partial => 'rails_admin/main/user_info', :locals => {:current_user => current_user}) %>
+<%= render(:partial => 'rails_admin/main/user_info', :locals => {:current_user => _current_user}) %>
       </div>
     </div>
     <div id="content">
 <%= yield %>
     </div>
   </div>
+  <%= javascript_include_tag('rails_admin/yahoo.color.js') %>
+  <%= javascript_include_tag('rails_admin/colorpicker.js') %>
 </body>
 </html>

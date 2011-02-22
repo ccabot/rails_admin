@@ -5,32 +5,39 @@
   <title><%= @page_name %> | <%= @plugin_name %></title>
   <%= stylesheet_link_tag('rails_admin/base.css') %>
   <%= stylesheet_link_tag('rails_admin/delete.css') %>
-  <title><%= @page_name %></title>
 </head>
 <body>
-  <div id="wraper">
+  <div id="wrapper">
     <div id="header">
       <div id="headerLeft">
         <ul class="breadcrumb">
           <li>
+            <%= link_to(t('home.name'), '/') %>
+          </li>
+          <li>
+            &rsaquo;
             <%= link_to(t('admin.dashboard.name'), rails_admin_dashboard_path) %>
-            &rsaquo;
           </li>
           <li>
-            <%= link_to(@abstract_model.pretty_name, rails_admin_list_path(:model_name => @abstract_model.to_param)) %>
             &rsaquo;
+            <%= link_to(@model_config.list.label, rails_admin_list_path(:model_name => @abstract_model.to_param)) %>
           </li>
           <li>
-            <%= link_to(@page_name, rails_admin_new_path(:model_name => @abstract_model.to_param)) %>
+            &rsaquo;
+            <span><%= @page_name %></span>
           </li>
         </ul>
-        <h1><%= @plugin_name %></h1>
+        <h1 id="logo">
+          <%= link_to rails_admin_dashboard_path do %>
+            <span class="image_replacement"><%= @plugin_name %></span>
+          <% end -%>
+        </h1>
       </div>
 
 <%= render(:partial => 'rails_admin/main/navigation') %>
 
       <div id="headerRight">
-<%= render(:partial => 'rails_admin/main/user_info', :locals => {:current_user => current_user}) %>
+<%= render(:partial => 'rails_admin/main/user_info', :locals => {:current_user => _current_user}) %>
       </div>
     </div>
     <div id="content">

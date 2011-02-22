@@ -1,33 +1,24 @@
-      <div id="contentHeader">
-        <h2><%= @page_name %></h2>
-        <div id="quickAccess">
-          <ul id="quick">
-            <!--<li><a href="#">Quick add</a></li>-->
-            <li>
-             <%= link_to(t("admin.history.name"), rails_admin_history_show_path(:model_name => @abstract_model.to_param, :id => params[:id]), :class => "addlink") %>
-            </li>
-          </ul>
-
-        </div>
-          <a href="<%= rails_admin_destroy_path(:model_name => @abstract_model.to_param, :id => params[:id]) %>" id="deleteItem"><img src="/images/cross.png" alt="Delete"><%= t("admin.list.delete_action") %></a>
-      </div>
+<div id="contentHeader">
+  <h2><%= @page_name %></h2>
+  <% if @object.errors[:base].size > 0 %>
+    <%= @object.errors[:base] %>
+  <% end %>
+  <div id="quickAccess">
+    <ul id="quick">
+      <!--<li><a href="#">Quick add</a></li>-->
+      <li>
+      <%= link_to(t("admin.history.name"), rails_admin_history_object_path(:id => params[:id]), :class => "addlink") %>
+      </li>
+    </ul>
+    <a href="<%= rails_admin_delete_path(:model_name => @abstract_model.to_param, :id => params[:id]) %>" id="deleteItem"><%= image_tag "rails_admin/cross.png", :alt => "Delete" %><%= t("admin.list.delete_action") %></a>
+  </div>
+</div>
 <%= render(:partial => 'layouts/rails_admin/flash', :locals => {:flash => flash}) -%>
-      <div id="contentMainNew">
-        <%= form_for(@object, :url => rails_admin_update_path(:model_name => @abstract_model.to_param, :id => @object.id)) do %>
-          <fieldset>
-<%= render(:partial => 'form_section', :collection => RailsAdmin::config(@object).edit.groups) -%>
-
-            <ul id="submitArea">
-              <li id="saveContainer">
-                <%= submit_tag t("admin.new.save"), :class => "button default", :name => "_save", :id => "save_btn" %>
-              </li>
-              <li id="saveEditContainer">
-                <%= submit_tag t("admin.new.save_and_edit"), :class => "button", :name => "_add_edit", :id => "saveEdit_btn" %>
-              </li>
-              <li id="cancelContainer">
-                <%= submit_tag t("admin.new.cancel"), :class => "button", :name => "_continue", :id => "cancel_btn" %>
-              </li>
-            </ul>
-          </fieldset>
-        <% end %>
-      </div>
+<div id="contentMainNew">
+  <%= form_for(@object, :url => rails_admin_update_path(:model_name => @abstract_model.to_param, :id => @object.id), :html => { :method => "put", :multipart => true }) do %>
+    <fieldset>
+      <%= render(:partial => 'form_section', :collection => RailsAdmin::config(@object).edit.visible_groups) -%>
+      <%= render :partial => 'edit_submit_buttons' %>
+    </fieldset>
+  <% end %>
+</div>

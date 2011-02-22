@@ -1,5 +1,6 @@
 require 'rails_admin/engine'
 require 'rails_admin/abstract_model'
+require 'rails_admin/abstract_history'
 require 'rails_admin/config'
 
 module RailsAdmin
@@ -32,6 +33,17 @@ module RailsAdmin
 
   DEFAULT_AUTHORIZE = Proc.new {}
 
+  DEFAULT_CURRENT_USER = Proc.new do
+    warden = request.env["warden"]
+    if warden
+      warden.user
+    elsif respond_to?(:current_user)
+      current_user
+    else
+      raise "See RailsAdmin.current_user_method or setup Devise / Warden"
+    end
+  end
+
   # Setup authentication to be run as a before filter
   # This is run inside the controller instance so you can setup any authentication you need to
   #
@@ -63,7 +75,7 @@ module RailsAdmin
   #
   # @example Custom
   #   RailsAdmin.authorize_with do
-  #     warden.user.is_admin?
+  #     redirect_to root_path unless warden.user.is_admin?
   #   end
   #
   # @see RailsAdmin::DEFAULT_AUTHORIZE
@@ -72,12 +84,28 @@ module RailsAdmin
     @authorize || DEFAULT_AUTHORIZE
   end
 
+  # Setup a different method to determine the current user or admin logged in.
+  # This is run inside the controller instance and made available as a helper.
+  #
+  # By default, _request.env["warden"].user_ or _current_user_ will be used.
+  #
+  # @example Custom
+  #   RailsAdmin.current_user_method do
+  #     current_admin
+  #   end
+  #
+  # @see RailsAdmin::DEFAULT_CURRENT_USER
+  def self.current_user_method(&blk)
+    @current_user = blk if blk
+    @current_user || DEFAULT_CURRENT_USER
+  end
+
   # Setup RailsAdmin
   #
   # If a model class is provided as the first argument model specific
   # configuration is loaded and returned.
   #
-  # Otherwise yields self for general configuration to be used in 
+  # Otherwise yields self for general configuration to be used in
   # an initializer.
   #
   # @see RailsAdmin::Config.load

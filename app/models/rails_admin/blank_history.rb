@@ -1,11 +1,16 @@
 module RailsAdmin
   class BlankHistory
-    attr_accessor :number, :month, :year, :fake
-    def initialize
+    attr_accessor :number, :month, :year
+    def initialize(month, year)
       @number = 0
-      @month = "No data"
-      @year = "for this month"
-      @fake = 1
+      @month = month
+      @year = year
     end
+
+    # Make BlankHistory look like History when it gets JSON-serialized.
+    def to_hash(*a)
+      {"history" => {"number" => @number, "month" => @month, "year" => @year}}
+    end
+
   end
 end

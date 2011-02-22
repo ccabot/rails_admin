@@ -1,56 +1,62 @@
 module RailsAdmin
-  class MainController < ApplicationController
-    before_filter :get_model, :except => [:index, :history, :get_history]
+  class MainController < RailsAdmin::ApplicationController
+    before_filter :get_model, :except => [:index]
     before_filter :get_object, :only => [:edit, :update, :delete, :destroy]
+    before_filter :get_bulk_objects, :only => [:bulk_delete, :bulk_destroy]
     before_filter :get_attributes, :only => [:create, :update]
-    before_filter :check_for_cancel, :only => [:create, :update, :destroy]
+    before_filter :check_for_cancel, :only => [:create, :update, :destroy, :bulk_destroy]
 
     def index
       @page_name = t("admin.dashboard.pagename")
       @page_type = "dashboard"
 
-      @history = History.latest
+      @history = AbstractHistory.history_latest_summaries
       # history listing with ref = 0 and section = 4
-      @historyListing, @current_month = History.get_history_for_month(0, 4)
+      @historyListing, @current_month = AbstractHistory.history_for_month(0, 4)
 
       @abstract_models = RailsAdmin::AbstractModel.all
 
+      @most_recent_changes = {}
       @count = {}
       @max = 0
       @abstract_models.each do |t|
         current_count = t.count
         @max = current_count > @max ? current_count : @max
-
         @count[t.pretty_name] = current_count
+        @most_recent_changes[t.pretty_name] = AbstractHistory.most_recent_history(t.pretty_name).last.try(:updated_at)
       end
 
-      users = User.find(:all)
-      @users = {}
-      users.each do |t|
-        @users[t.id] = t.email
-      end
       render :layout => 'rails_admin/dashboard'
     end
 
     def list
       list_entries
-      render :layout => 'rails_admin/list'
+      @xhr = request.xhr?
+      visible = lambda { @model_config.list.visible_fields.map {|f| f.name } }
+      respond_to do |format|
+        format.html { render :layout => @xhr ? false : 'rails_admin/list' }
+        format.json { render :json => @objects.to_json(:only => visible.call) }
+        format.xml { render :xml => @objects.to_json(:only => visible.call) }
+      end
     end
 
     def new
       @object = @abstract_model.new
-      @page_name = action_name.capitalize + " " + @abstract_model.pretty_name.downcase
+      @page_name = t("admin.actions.create").capitalize + " " + @model_config.create.label.downcase
       @page_type = @abstract_model.pretty_name.downcase
       render :layout => 'rails_admin/form'
     end
 
     def create
       @modified_assoc = []
-      @object = @abstract_model.new(@attributes)
-      @page_name = action_name.capitalize + " " + @abstract_model.pretty_name.downcase
+      @object = @abstract_model.new
+      @object.attributes = @attributes
+      @object.associations = params[:associations]
+      @page_name = t("admin.actions.create").capitalize + " " + @model_config.create.label.downcase
       @page_type = @abstract_model.pretty_name.downcase
 
-      if @object.save && update_all_associations
+      if @object.save
+        AbstractHistory.create_history_item("Created #{@model_config.list.with(:object => @object).object_label}", @object, @abstract_model, _current_user)
         redirect_to_on_success
       else
         render_error
@@ -58,28 +64,33 @@ module RailsAdmin
     end
 
     def edit
-      @page_name = action_name.capitalize + " " + @abstract_model.pretty_name.downcase
+      @page_name = t("admin.actions.update").capitalize + " " + @model_config.update.label.downcase
       @page_type = @abstract_model.pretty_name.downcase
       render :layout => 'rails_admin/form'
     end
 
     def update
+      @cached_assocations_hash = associations_hash
       @modified_assoc = []
 
-      @page_name = action_name.capitalize + " " + @abstract_model.pretty_name.downcase
+      @page_name = t("admin.actions.update").capitalize + " " + @model_config.update.label.downcase
       @page_type = @abstract_model.pretty_name.downcase
 
       @old_object = @object.clone
 
-      if @object.update_attributes(@attributes) && update_all_associations
+      @object.attributes = @attributes
+      @object.associations = params[:associations]
+
+      if @object.save
+        AbstractHistory.create_update_history @abstract_model, @object, @cached_assocations_hash, associations_hash, @modified_assoc, @old_object, _current_user
         redirect_to_on_success
       else
-        render_error
+        render_error :edit
       end
     end
 
     def delete
-      @page_name = action_name.capitalize + " " + @abstract_model.pretty_name.downcase
+      @page_name = t("admin.actions.delete").capitalize + " " + @model_config.list.label.downcase
       @page_type = @abstract_model.pretty_name.downcase
 
       render :layout => 'rails_admin/delete'
@@ -87,87 +98,29 @@ module RailsAdmin
 
     def destroy
       @object = @object.destroy
-      flash[:notice] = t("admin.delete.flash_confirmation", :name => @abstract_model.pretty_name)
+      flash[:notice] = t("admin.delete.flash_confirmation", :name => @model_config.list.label)
 
-      check_history
+      AbstractHistory.create_history_item("Destroyed #{@model_config.list.with(:object => @object).object_label}", @object, @abstract_model, _current_user)
 
       redirect_to rails_admin_list_path(:model_name => @abstract_model.to_param)
     end
 
-    def get_pages
-      list_entries
-      @xhr = true;
-      render :template => 'rails_admin/main/list'
-    end
-
-    def history
-      ref = params[:ref].to_i
-
-      if ref.nil? or ref > 0
-        not_found
-      else
-        current_diff = -5 * ref
-        start_month = (5 + current_diff).month.ago.month
-        start_year = (5 + current_diff).month.ago.year
-        stop_month = (current_diff).month.ago.month
-        stop_year = (current_diff).month.ago.year
-
-        render :json => History.get_history_for_dates(start_month, stop_month, start_year, stop_year)
-      end
-    end
-
-    def get_history
-      if params[:ref].nil? or params[:section].nil?
-        not_found
-      else
-        @history, @current_month = History.get_history_for_month(params[:ref], params[:section])
-        render :template => 'rails_admin/main/history'
-      end
-    end
-
-    def show_history
+    def bulk_delete
+      @page_name = t("admin.actions.delete").capitalize + " " + @model_config.list.label.downcase
       @page_type = @abstract_model.pretty_name.downcase
-      @page_name = t("admin.history.page_name", :name => @abstract_model.pretty_name)
-      @general = true
 
-      options = {}
-      options[:order] = "created_at DESC"
-      options[:conditions] = []
-      options[:conditions] << conditions = "`table` = ?"
-      options[:conditions] << @abstract_model.pretty_name
+      render :layout => 'rails_admin/delete'
+    end
 
-      if params[:id]
-        get_object
-        @page_name = t("admin.history.page_name", :name => object_label(@object))
-        options[:conditions][0] += " and `item` = ?"
-        options[:conditions] << params[:id]
-        @general = false
+    def bulk_destroy
+      @destroyed_objects = @abstract_model.destroy(params[:bulk_ids])
+
+      @destroyed_objects.each do |object|
+        message = "Destroyed #{@model_config.list.with(:object => object).object_label}"
+        AbstractHistory.create_history_item(message, object, @abstract_model, _current_user)
       end
 
-      if params[:query]
-        options[:conditions][0] += " and (`message` LIKE ? or `username` LIKE ?)"
-        options[:conditions] << "%#{params["query"]}%"
-        options[:conditions] << "%#{params["query"]}%"
-      end
-
-      if params["sort"]
-        options.delete(:order)
-        if params["sort_reverse"] == "true"
-          options[:order] = "#{params["sort"]} desc"
-        else
-          options[:order] = params["sort"]
-        end
-      end
-
-      @history = History.find(:all, options)
-
-      if @general and not params[:all]
-        @current_page = (params[:page] || 1).to_i
-        options.merge!(:page => @current_page, :per_page => 20)
-        @page_count, @history = History.paginated(options)
-      end
-
-      render :layout => 'rails_admin/list'
+      redirect_to rails_admin_list_path(:model_name => @abstract_model.to_param)
     end
 
     def handle_error(e)
@@ -184,27 +137,24 @@ module RailsAdmin
 
     private
 
-    def get_model
-      model_name = to_model_name(params[:model_name])
-      @abstract_model = RailsAdmin::AbstractModel.new(model_name)
-      @model_config = RailsAdmin.config(@abstract_model)
-      @properties = @abstract_model.properties
-    end
-
-    def get_object
-      @object = @abstract_model.get(params[:id])
-      @model_config.bind(:object, @object)
-      not_found unless @object
+    def get_bulk_objects
+      @bulk_ids = params[:bulk_ids]
+      @bulk_objects = @abstract_model.get_bulk(@bulk_ids)
+      not_found unless @bulk_objects
     end
 
     def get_sort_hash
-      sort = params[:sort]
-      sort ? {:sort => sort} : {}
+      sort = params[:sort] || RailsAdmin.config(@abstract_model).list.sort_by
+      {:sort => sort}
     end
 
     def get_sort_reverse_hash
-      sort_reverse = params[:sort_reverse]
-      sort_reverse ? {:sort_reverse => sort_reverse == "true"} : {}
+      sort_reverse = if params[:sort]
+          params[:sort_reverse] == 'true'
+      else
+        not RailsAdmin.config(@abstract_model).list.sort_reverse?
+      end
+      {:sort_reverse => sort_reverse}
     end
 
     def get_query_hash(options)
@@ -249,120 +199,37 @@ module RailsAdmin
 
     def get_attributes
       @attributes = params[@abstract_model.to_param] || {}
-      # Delete fields that are blank
       @attributes.each do |key, value|
+        # Deserialize the attribute if attribute is serialized
+        if @abstract_model.model.serialized_attributes.keys.include?(key) and value.is_a? String
+          @attributes[key] = YAML::load(value)
+        end
+        # Delete fields that are blank
         @attributes[key] = nil if value.blank?
       end
     end
 
-    def update_all_associations
-      @abstract_model.associations.each do |association|
-        ids = (params[:associations] || {}).delete(association[:name])
-        case association[:type]
-        when :has_one
-          update_association(association, ids)
-        when :has_many
-          update_associations(association, ids.to_a)
-        end
-      end
-    end
-
-    def update_association(association, id = nil)
-      associated_model = RailsAdmin::AbstractModel.new(association[:child_model])
-      if object = associated_model.get(id)
-        if object.send(association[:child_key].first) != @object.id
-          @modified_assoc << association[:pretty_name]
-        end
-        object.update_attributes(association[:child_key].first => @object.id)
-      end
-    end
-
-    def update_associations(association, ids = [])
-      @object.send(association[:name]).clear
-      ids.each do |id|
-        update_association(association, id)
-      end
-      @object.save
-    end
-
     def redirect_to_on_success
       param = @abstract_model.to_param
-      pretty_name = @abstract_model.pretty_name
+      pretty_name = @model_config.update.label
       action = params[:action]
 
-      check_history
-
-      if params[:_add_another] == "Save and add another"
-
-        flash[:notice] = t("admin.flash.successful", :name => pretty_name, :action => "#{action}d")
+      if params[:_add_another]
+        flash[:notice] = t("admin.flash.successful", :name => pretty_name, :action => t("admin.actions.#{action}d"))
         redirect_to rails_admin_new_path(:model_name => param)
-      elsif params[:_add_edit] == "Save and edit"
-        flash[:notice] = t("admin.flash.successful", :name => pretty_name, :action => "#{action}d")
+      elsif params[:_add_edit]
+        flash[:notice] = t("admin.flash.successful", :name => pretty_name, :action => t("admin.actions.#{action}d"))
         redirect_to rails_admin_edit_path(:model_name => param, :id => @object.id)
-      elsif
-        flash[:notice] = t("admin.flash.successful", :name => pretty_name, :action => "#{action}d")
+      else
+        flash[:notice] = t("admin.flash.successful", :name => pretty_name, :action => t("admin.actions.#{action}d"))
         redirect_to rails_admin_list_path(:model_name => param)
       end
     end
 
-    def check_history
+    def render_error whereto = :new
       action = params[:action]
-      message = ""
-
-      case action
-      when "create"
-        message = "#{action.capitalize}d #{object_label(@object)}"
-      when "update"
-        # determine which fields changed ???
-        changed_property_list = []
-        @properties = @abstract_model.properties.reject{|property| [:id, :created_at, :created_on, :deleted_at, :updated_at, :updated_on, :deleted_on].include?(property[:name])}
-
-        @properties.each do |property|
-          property_name = property[:name].to_param
-          if @old_object.send(property_name) != @object.send(property_name)
-            changed_property_list << property_name
-          end
-        end
-
-        @abstract_model.associations.each do |t|
-          assoc = changed_property_list.index(t[:child_key].to_param)
-          if assoc
-            changed_property_list[assoc] = "associated #{t[:pretty_name]}"
-          end
-        end
-
-        @modified_assoc.uniq.each do |t|
-          changed_property_list << "associated #{t}"
-        end
-
-        if not changed_property_list.empty?
-          message = "Changed #{changed_property_list.join(", ")}"
-        end
-      when "destroy"
-        message = "Destroyed #{object_label(@object)}"
-      end
-
-      if not message.empty?
-        date = Time.now
-        History.create(
-        :message => message,
-        :item => @object.id,
-        :table => @abstract_model.pretty_name,
-        :username => current_user.email,
-        :month => Time.now.month,
-        :year => Time.now.year
-        )
-      end
-    end
-
-    def render_error
-      action = params[:action]
-      flash.now[:error] = t("admin.flash.error", :name => @abstract_model.pretty_name, :action => "#{action}d")
-      render :new, :layout => 'rails_admin/form'
-    end
-
-    def to_model_name(param)
-      param.split("::").map{|x| x.camelize}.join("::")
+      flash.now[:error] = t("admin.flash.error", :name => @model_config.update.label, :action => t("admin.actions.#{action}d"))
+      render whereto, :layout => 'rails_admin/form'
     end
 
     def check_for_cancel
@@ -405,16 +272,16 @@ module RailsAdmin
       @page_name = t("admin.list.select", :name => @model_config.list.label.downcase)
     end
 
-    def object_label(object)
-      if object.nil?
-        nil
-      elsif object.respond_to?(:name) && object.name
-        object.name[0..10]
-      elsif object.respond_to?(:title) && object.title
-        object.title[0..10]
-      else
-        "#{object.class.to_s} ##{object.id}"
+    def associations_hash
+      associations = {}
+      @abstract_model.associations.each do |association|
+        if [:has_many, :has_and_belongs_to_many].include?(association[:type])
+          records = Array(@object.send(association[:name]))
+          associations[association[:name]] = records.collect(&:id)
+        end
       end
+      associations
     end
+
   end
 end

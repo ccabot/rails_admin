@@ -41,14 +41,36 @@
   margin-left:2px;
 }
 
-.field{
+.formSection label.inline{
+  display:inline;
+  float:none;
+  font-weight:normal;
+}
+
+.field {
   margin-bottom: 1px;
   padding-bottom: 5px;
   padding-top: 5px;
 }
 
-.stringField, .intField, .bigDecimalField, .floatField, .dateField, .timestampField, .timeField, .datetimeField, .textField{
-  float:left;
+.field .input {
+  margin-left: 103px;
+}
+
+.field .row {
+  margin: 10px 0;
+}
+
+.field .date,
+.field .datetime,
+.field .decimal,
+.field .float,
+.field .integer,
+.field .text,
+.field .time,
+.field .timestamp,
+.field .password,
+.field .string {
   font-family:Verdana, Geneva, sans-serif;
   font-size:12px;
   padding:5px;
@@ -59,21 +81,30 @@
   border-right:1px solid #dbdfe6;
 }
 
-.intField{
-  width:90px;
+.field .boolean {
+  float:left;
+  margin-top:6px;
 }
 
-.bigDecimalField{
+.field .decimal {
   width:170px;
 }
 
-.floatField{
+.field .float {
   width:120px;
 }
 
-.boolField{
-  float:left;
-  margin-top:6px;
+.field .date, .field .timestamp, .field .time, .field .datetime {
+  width:150px;
+}
+
+.field .integer {
+  width:90px;
+}
+
+.field .text {
+  height:100px;
+  width: 450px;
 }
 
 .formSection p.boolPlace{
@@ -126,14 +157,9 @@
 
 .errorMessage{
   display:block;
-  float:left;
   margin-top:5px;
-  margin-left:5px;
+  margin-left:103px;
   color:#bd2b14;
-}
-
-.dateField, .timestampField, .timeField, .datetimeField{
-  width:150px;
 }
 
 #submitArea{
@@ -145,10 +171,6 @@
 #submitArea li{
   float:left;
   margin-right:4px;
-}
-
-.textField{
-  height:100px;
 }
 
 .breakSpan{
@@ -167,6 +189,8 @@ p.help{
   font-size:10px;
   margin-left:103px;
   display:block;
+  font-style: italic;
+  color: #999;
 }
 
 .selectField{
@@ -192,7 +216,7 @@ p.help{
 }
 
 .searchMany{
-  background:url(/images/magnifier.png) no-repeat;
+  background:url(../../images/rails_admin/magnifier.png) no-repeat;
   padding-left:19px;
   padding-top:5px;
   font-size:11px;
@@ -326,7 +350,6 @@ input.default:active{
 #deleteItem{
   float:right;
   text-decoration:none;
-  margin-top:-2px;
   margin-right:10px;
   color:#AD0208;
   font-weight:bold;
@@ -337,3 +360,8 @@ input.default:active{
   top:4px;
   right:2px;
 }
+
+.cke_skin_kama {
+  margin-left: 100px;
+}
+
