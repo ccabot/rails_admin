@@ -2,11 +2,11 @@ RailsAdmin
 ==========
 RailsAdmin is a Rails engine that provides an easy-to-use interface for managing your data.
 
-RailsAdmin started as a port of [MerbAdmin](http://github.com/sferik/merb-admin) to Rails 3
+RailsAdmin started as a port of [MerbAdmin](https://github.com/sferik/merb-admin) to Rails 3
 and was implemented as a [Ruby Summer of Code project](http://www.rubysoc.org/projects)
-by [Bogdan Gaza](http://github.com/hurrycane) with mentors [Erik Michaels-Ober](http://github.com/sferik),
-[Yehuda Katz](http://github.com/wycats),
-[Luke van der Hoeven](http://github.com/plukevdh), and [Rein Henrichs](http://github.com/reinh).
+by [Bogdan Gaza](https://github.com/hurrycane) with mentors [Erik Michaels-Ober](https://github.com/sferik),
+[Yehuda Katz](https://github.com/wycats),
+[Luke van der Hoeven](https://github.com/plukevdh), and [Rein Henrichs](https://github.com/reinh).
 
 It currently offers the following features:
 
@@ -16,7 +16,7 @@ It currently offers the following features:
 * Safely delete data
 * Automatic form validation
 * Search
-* Authentication (via [Devise](http://github.com/plataformatec/devise))
+* Authentication (via [Devise](https://github.com/plataformatec/devise))
 * User action history
 
 Supported ORMs:
@@ -64,29 +64,23 @@ Run:
 
 And then run:
 
-    $ rails generate rails_admin:install_admin
+    $ rake rails_admin:install
 
-This task will install RailsAdmin and [Devise](http://github.com/plataformatec/devise) if you
-don't already have it installed. [Devise](http://github.com/plataformatec/devise) is strongly
+This task will install RailsAdmin and [Devise](https://github.com/plataformatec/devise) if you
+don't already have it installed. [Devise](https://github.com/plataformatec/devise) is strongly
 recommended to protect your data from anonymous users.
 
 If you plan to use Devise, but want to use a custom model for authentication
 (default is User) you can provide that as an argument for the installer. For example
 to override the default with a Member model run:
 
-    $ rails generate rails_admin:install_admin member
+    $ rake rails_admin:install model_name=member
 
 If you want to use the CKEditor, you need to [download it](http://ckeditor.com/download) from source
 and unpack the 'ckeditor' folder into your default 'public/javascripts' folder. If you're using any
 non-Windows system, you can try to use the automatic downloader:
 
-    $ rake admin:ckeditor_download
-
-When running RailsAdmin in production the images, stylesheets, and javascript assets may return 404
-not found error's depending on your servers static assets configuration.  To prevent this issue you
-can copy assets directly into your application by running:
-
-    $ rake admin:copy_assets
+    $ rake rails_admin:ckeditor_download
 
 Usage
 -----
@@ -94,7 +88,8 @@ Start the server:
 
     $ rails server
 
-You should now be able to administer your site at <http://localhost:3000/admin>
+You should now be able to administer your site at
+[http://localhost:3000/admin](http://localhost:3000/admin).
 
 Configuration
 -------------
@@ -142,7 +137,7 @@ The blacklist is effective on top of that, still, so that if you also have:
 then only `Class2` and `Class3` would be made available to RailsAdmin.
 
 The whitelist approach may be useful if RailsAdmin is used only for a part of the application and you want to make
-sure that new models are not automatically added to RailsAdmin, e.g. because of security concerns. 
+sure that new models are not automatically added to RailsAdmin, e.g. because of security concerns.
 
 ### Model Class and Instance Labels ###
 
@@ -243,6 +238,70 @@ tabs. Even though this option is not model specific, it shares the same
 semantics as the earlier ones - you could also pass in a block which would be
 evaluated at runtime.
 
+**Create a dropdown menu in navigation**
+
+This will desactivate config.navigation.max_visible_tabs.
+
+    RailsAdmin.config do |config|
+      config.model Team do
+        parent League
+      end
+    end
+
+    RailsAdmin.config do |config|
+      config.model Division do
+        parent League
+      end
+    end
+
+Obtained navigation:
+
+    Dashboard
+    ...
+    League
+      Division
+      Team
+    ...
+
+If you want a non-clickable root menu entry, add 'dropdown ENTRY_NAME' to your parent.
+Your parent will then be placed INSIDE his dropdown, in FIRST position.
+
+Added to previous example:
+
+    RailsAdmin.config do |config|
+      config.model League do
+        dropdown 'League related'
+      end
+    end
+
+Obtained navigation:
+
+    Dashboard
+    ...
+    League related  # (non-clickable)
+      League
+      Division
+      Team
+    ...
+
+**Change models order in navigation**
+
+By default, they are ordered by alphabetical order. If you need to override this, specify
+a weight attribute. Default is 0. Lower values will bubble items to the left, higher values
+will move them to the right. Items with same weight will still be ordered by alphabetical order.
+The mecanism is fully compatible with dropdown menus. Items will be ordered within their own
+menu subset.
+
+Example:
+
+    RailsAdmin.config do |config|
+      config.model League do
+        dropdown 'League related'
+        weight -1
+      end
+    end
+
+The 'League related' dropdown menu will move to the leftmost position.
 
 ### List view ###
 
@@ -485,6 +544,7 @@ column, you can:
 
 ### Create and update views
 
+* Form rendering
 * Field groupings
   * Visibility
   * Labels
@@ -497,6 +557,37 @@ column, you can:
   * Creating a custom field factory
   * Overriding field help texts
   * CKEditor integration
+
+**Form rendering**
+
+RailsAdmin renders these views with Rails' form builder (form_for). If you want to use a different
+form builder then provide an override for the edit view or independingly for the
+create and update views. The argument is a symbol or string that is sent to the view
+to process the form. This is handy for integrating things like the nested form builder (https://github.com/ryanb/nested_form) if you need to override a field's edit template.
+
+    RailsAdmin.config do |config|
+      config.model Team do
+        edit do
+          form_builder :nested_form_for
+          field :name
+        end
+      end
+    end
+
+or independently
+
+    RailsAdmin.config do |config|
+      config.model Team do
+        create do
+          form_builder :create_form_for
+          field :name
+        end
+        update do
+          form_builder :update_form_for
+          field :name
+        end
+      end
+    end
 
 **Field groupings**
 
@@ -686,6 +777,7 @@ RailsAdmin ships with the following field types:
 * integer
 * password _initializes if string type column's name is password_
 * string
+* enum
 * text
 * time
 * timestamp
@@ -733,6 +825,34 @@ Everything can be overridden with `help`:
       end
     end
 
+**Fields - Enum**
+
+Fields of datatype string, integer, text can be rendered with select boxes, if object responds to `method_enum`.
+
+    class Team < ActiveRecord::Base
+      ...
+      def color_enum
+        self.team.available_color_choices
+        # return collection like ["blue", "yellow", "red"] or [["blue", 1], ["yellow", 2], ["red", 3]]
+      end
+      ...
+    end
+    
+    RailsAdmin.config do |config|
+      config.model Team do
+        edit do
+          field :name
+          field :color
+          field :created_at do
+            date_format :short
+          end
+          field :updated_at do
+            strftime_format "%Y-%m-%d"
+          end
+        end
+      end
+    end
+
 **Fields - CKEditor integration**
 
 CKEditor can be enabled on fields of type text:
@@ -747,10 +867,22 @@ CKEditor can be enabled on fields of type text:
       end
     end
 
-In this example we configured a field named description to instantiate as a
-text field and set ckeditor option to true. If the database column is a text
-field, explicitly setting the type as the second argument is not
-necessary.
+**Fields - Ordered has_many/has_and_belongs_to_many/has_many :through associations**
+
+Orderable can be enabled on filtering multiselect fields (has_many, has_many :through & has_and_belongs_to_many associations), allowing selected options to be moved up/down.
+RailsAdmin will handle ordering in and out of the form.
+
+    RailsAdmin.config do |config|
+      config.model Player do
+        edit do
+          field :fans do
+            orderable true
+          end
+        end
+      end
+    end
+
+You'll need to handle ordering in your model with a position column for example.
 
 ### Mass Assignment Operations ###
 
@@ -820,6 +952,18 @@ accomplished like this:
         end
       end
     end
+    
+Or even scope it like this:
+
+    RailsAdmin.config do |config|
+      config.models do
+        list do
+          fields_of_type :datetime do
+            date_format :compact
+          end
+        end
+      end
+    end
 
 Authorization
 -------------
@@ -852,15 +996,15 @@ Here are some ways *you* can contribute:
 * by writing specifications
 * by writing code (**no patch is too small**: fix typos, add comments, clean up inconsistent whitespace)
 * by refactoring code
-* by resolving [issues](http://github.com/sferik/rails_admin/issues)
+* by resolving [issues](https://github.com/sferik/rails_admin/issues)
 * by reviewing patches
 
 Submitting an Issue
 -------------------
-We use the [GitHub issue tracker](http://github.com/sferik/rails_admin/issues) to track bugs and
+We use the [GitHub issue tracker](https://github.com/sferik/rails_admin/issues) to track bugs and
 features. Before submitting a bug report or feature request, check to make sure it hasn't already
 been submitted. You can indicate support for an existing issue by voting it up. When submitting a
-bug report, please include a [Gist](http://gist.github.com/) that includes a stack trace and any
+bug report, please include a [Gist](https://gist.github.com/) that includes a stack trace and any
 details that may be necessary to reproduce the bug, including your gem version, Ruby version, and
 operating system. Ideally, a bug report should include a pull request with failing specs.
 
@@ -878,4 +1022,4 @@ Submitting a Pull Request
 
 Contact
 -------
-If you have questions about contributing to RailsAdmin, please contact [Erik Michaels-Ober](http://github.com/sferik) and [Bogdan Gaza](http://github.com/hurrycane).
+If you have questions about contributing to RailsAdmin, please contact [Erik Michaels-Ober](https://github.com/sferik) and [Bogdan Gaza](https://github.com/hurrycane).

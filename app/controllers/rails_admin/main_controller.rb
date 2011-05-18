@@ -80,7 +80,6 @@ module RailsAdmin
         @authorization_adapter.authorize(:create, @abstract_model, @object)
       end
       @object.attributes = @attributes
-      @object.associations = params[:associations]
       @page_name = t("admin.actions.create").capitalize + " " + @model_config.label.downcase
       @page_type = @abstract_model.pretty_name.downcase
 
@@ -126,7 +125,6 @@ module RailsAdmin
       @model_config.update.fields.each {|f| f.parse_input(@attributes) if f.respond_to?(:parse_input) }
 
       @object.attributes = @attributes
-      @object.associations = params[:associations]
 
       if @object.save
         AbstractHistory.create_update_history @abstract_model, @object, @cached_assocations_hash, associations_hash, @modified_assoc, @old_object, _current_user
@@ -305,11 +303,8 @@ module RailsAdmin
       action = params[:action]
 
       flash.now[:error] = t("admin.flash.error", :name => @model_config.label, :action => t("admin.actions.#{action}d"))
-
-      if @object.errors[:base].size > 0
-        flash.now[:error] << ". " << @object.errors[:base].to_s
-      end
-
+      flash.now[:error] += ". #{@object.errors[:base].to_sentence}" unless @object.errors[:base].blank?
+      
       respond_to do |format|
         format.html { render whereto, :layout => 'rails_admin/form', :status => :not_acceptable }
         format.js   { render whereto, :layout => 'rails_admin/plain.html.erb', :status => :not_acceptable  }
