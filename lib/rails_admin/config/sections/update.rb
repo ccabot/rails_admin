@@ -32,10 +32,24 @@ module RailsAdmin
             else
               f.group :default
             end
+            # Hide owning ends of polymorphic associations in edit views as
+            # they'd need special handling in RailsAdmin::AbstractObject that
+            # has not been implemented
+            if f.association? && f.association[:options][:as]
+              f.hide
+            end
             if f.serial? || @@default_hidden_fields.include?(f.name)
               f.hide
             end
           end
+        end
+
+        # Should be a method that's called as bindings[:view].send(@model_config.update.form_builder,...)
+        #  e.g.: bindings[:view].send(form_for,...) do |form|
+        #           form.text_field(...)
+        #        end
+        register_instance_option(:form_builder) do
+          :form_for
         end
       end
     end

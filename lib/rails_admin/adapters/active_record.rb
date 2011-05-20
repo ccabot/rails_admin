@@ -5,12 +5,29 @@ require 'rails_admin/abstract_object'
 module RailsAdmin
   module Adapters
     module ActiveRecord
+      def self.extended(abstract_model)
+        
+        # ActiveRecord does not handle has_one relationships the way it does for has_many, 
+        # and does not create any association_id and association_id= methods. 
+        # Added here for backward compatibility after a refactoring, but it does belong to ActiveRecord IMO.
+        # Support is hackish at best. Atomicity is respected for creation, but not while updating.
+        abstract_model.model.reflect_on_all_associations.select{|assoc| assoc.macro.to_s == 'has_one'}.each do |association|
+          abstract_model.model.send(:define_method, "#{association.name}_id") do
+            self.send(association.name).try(:id)
+          end
+          abstract_model.model.send(:define_method, "#{association.name}_id=") do |id|
+            association.klass.update_all({ association.primary_key_name => nil }, { association.primary_key_name => self.id }) if self.id
+            self.send(association.name.to_s + '=', associated = (id.blank? ? nil : association.klass.find_by_id(id)))
+          end
+        end
+      end
+            
       def self.polymorphic_parents(name)
         unless @polymorphic_parents
           @polymorphic_parents = {}
           RailsAdmin::AbstractModel.all.each do |abstract_model|
-            abstract_model.polymorphic_has_many_associations.each do |association|
-              (@polymorphic_parents[association[:options][:as]] ||= []) << abstract_model
+            abstract_model.polymorphic_associations.each do |association|
+              (@polymorphic_parents[association[:options][:as].to_sym] ||= []) << abstract_model
             end
           end
         end
@@ -117,8 +134,8 @@ module RailsAdmin
         end
       end
 
-      def polymorphic_has_many_associations
-        has_many_associations.select do |association|
+      def polymorphic_associations
+        (has_many_associations + has_one_associations).select do |association|
           association[:options][:as]
         end
       end
@@ -144,6 +161,7 @@ module RailsAdmin
 
       def merge_order(options)
         @sort ||= options.delete(:sort) || "id"
+        @sort = (@sort.to_s.include?('.') ? @sort : "#{model.table_name}.#{@sort}")
         @sort_order ||= options.delete(:sort_reverse) ? "asc" : "desc"
         options.merge(:order => "#{@sort} #{@sort_order}")
       end

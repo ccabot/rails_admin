@@ -106,7 +106,7 @@ describe "RailsAdmin Basic Create" do
       get rails_admin_new_path(:model_name => "league")
 
       fill_in "league[name]", :with => "National League"
-      select @divisions[0].name, :from => "associations_divisions"
+      select @divisions[0].name, :from => "league_division_ids"
 
       click_button "Save"
 
@@ -131,7 +131,7 @@ describe "RailsAdmin Basic Create" do
       get rails_admin_new_path(:model_name => "fan")
 
       fill_in "fan[name]", :with => "John Doe"
-      select @teams[0].name, :from => "associations_teams"
+      select @teams[0].name, :from => "fan_team_ids"
       click_button "Save"
 
       @fan = RailsAdmin::AbstractModel.new("Fan").first
@@ -175,6 +175,18 @@ describe "RailsAdmin Basic Create" do
     it "should show an error message" do
       response.body.should contain("Player failed to be created")
       response.body.should have_tag "form", :action => "/admin/players"
+    end
+  end
+  
+  describe "create with object with errors on base" do
+    before(:each) do
+      get rails_admin_new_path(:model_name => "player")
+      fill_in "player[name]", :with => "Jackie Robinson on steroids"
+      click_button "Save and add another"
+    end
+
+    it "should show error base error message in flash" do
+      response.body.should contain("Player failed to be created. Player is cheating")
     end
   end
 end

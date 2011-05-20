@@ -22,7 +22,7 @@ module RailsAdmin
           fields << RailsAdmin::Config::Fields::Types.load("#{properties[:type]}_association").new(parent, properties[:name], properties)
         # If it's a concrete column
         elsif !properties.has_key?(:parent_model)
-          fields << RailsAdmin::Config::Fields::Types.load(properties[:type]).new(parent, properties[:name], properties)
+          fields << RailsAdmin::Config::Fields::Types.load(properties[:type]).new(parent, properties[:name], properties) unless properties[:type].blank?
         end
       end
 
@@ -87,5 +87,6 @@ end
 
 require 'rails_admin/config/fields/types'
 require 'rails_admin/config/fields/factories/password'
+require 'rails_admin/config/fields/factories/enum'
 require 'rails_admin/config/fields/factories/devise'
 require 'rails_admin/config/fields/factories/paperclip'
