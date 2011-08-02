@@ -111,16 +111,9 @@ module RailsAdmin
       options[:right_cut_label] ||= '&hellip;'
       options[:outer_window] ||= 2
       options[:inner_window] ||= 7
-      options[:page_param] ||= 'page'
-      options[:url] ||= ""
-
-      url = options.delete(:url)
-      url.delete(options[:page_param])
-      url = url.to_a.collect{|x| x.join("=")}.join("&")
-
-      url += (url.include?('=') ? '&' : '') + options[:page_param]
-      url = "?"+url
-
+      options[:page_param] ||= :page
+      options[:url] ||= {}
+      
       pages = {
         :all => (1..page_count).to_a,
         :left => [],
@@ -158,7 +151,7 @@ module RailsAdmin
       end
 
       b = []
-
+      
       [pages[:left], pages[:center], pages[:right]].each do |p|
         p.each do |page_number|
 
@@ -168,9 +161,9 @@ module RailsAdmin
           when current_page
             b << Builder::XmlMarkup.new.span(page_number, :class => "this-page")
           when page_count
-            b << link_to(page_number, "#{url}=#{page_number}", :class => "end", :remote => true)
+            b << link_to(page_number, "?" + options[:url].merge(options[:page_param] => page_number).to_query, :class => "end", :remote => options[:remote])
           else
-            b << link_to(page_number, "#{url}=#{page_number}", :remote => true)
+            b << link_to(page_number, "?" + options[:url].merge(options[:page_param] => page_number).to_query, :remote => options[:remote])
           end
         end
       end

@@ -2,6 +2,8 @@ RailsAdmin
 ==========
 RailsAdmin is a Rails engine that provides an easy-to-use interface for managing your data.
 
+See the demo here: http://demo.railsadmin.org/
+
 RailsAdmin started as a port of [MerbAdmin](https://github.com/sferik/merb-admin) to Rails 3
 and was implemented as a [Ruby Summer of Code project](http://www.rubysoc.org/projects)
 by [Bogdan Gaza](https://github.com/hurrycane) with mentors [Erik Michaels-Ober](https://github.com/sferik),
@@ -15,7 +17,8 @@ It currently offers the following features:
 * Easily update data
 * Safely delete data
 * Automatic form validation
-* Search
+* Search and filtering
+* Export data to CSV/JSON/XML
 * Authentication (via [Devise](https://github.com/plataformatec/devise))
 * User action history
 
@@ -24,14 +27,29 @@ Supported ORMs:
 * ActiveRecord
 
 _[Information](https://github.com/sferik/rails_admin/issues/105) about support for other ORMs._
+We plan to support Mongoid soon.
 
 Help
 ----
 If you have a question, you can ask the [official RailsAdmin mailing list](http://groups.google.com/group/rails_admin)
 or ping sferik on IRC in [#railsadmin on irc.freenode.net](http://webchat.freenode.net/?channels=railsadmin).
+Please don't use the issue tracker, which is for issues only.
+
+Check if the build is green here: http://ci.railsadmin.org/job/RailsAdmin/
+
+If you have good reasons to think you found a *rails_admin* bug, submit a ticket providing link to gists with:
+
+1. used rails_admin commit (in your Gemfile.lock)
+2. obtained stacktrace
+3. your initializers/rails_admin.rb
+4. models declarations that matter
+5. and anything else you find relevant
 
 API Update Note
 ---------------
+`object_label` is not directly configurable anymore, as it lead to performance issues when used with a list of records.
+Please use object_label_method instead.
+
 The ability to set model labels for each section (list, navigation, update, ...) has been removed,
 as it was deemed unnecessarily granular and was not fully honored in all displays.
 That also means that the methods `label_for_navigation`, etc. are no longer functional. They print a warning at the moment.
@@ -154,9 +172,9 @@ If you need to customize the label of the model, use:
 This label will be used anywhere the model name is shown, e.g. on the navigation tabs,
 Dashboard page, list pages, etc.
 
-**The object_label method**
+**The object_label_method method**
 
-The model configuration has another option `object_label` which configures
+The model configuration has another option `object_label_method` which configures
 the title display of a single database record, i.e. an instance of a model.
 
 By default it tries to call "name" or "title" methods on the record in question. If the object responds to neither,
@@ -165,23 +183,26 @@ database identifier. You can add label methods (or replace the default [:name, :
 
     RailsAdmin.config {|c| c.label_methods << :description}
 
-This `object_label` value is used in a number of places in RailsAdmin--for instance as the
-output of belongs to associations in the listing views of related models, as
+This `object_label_method` value is used in a number of places in RailsAdmin--for instance for the
+output of belongs to associations in the listing views of related models, for
 the option labels of the relational fields' input widgets in the edit views of
-related models and as part of the audit information stored in the history
+related models and for part of the audit information stored in the history
 records--so keep in mind that this configuration option has widespread
 effects.
 
     RailsAdmin.config do |config|
       config.model Team do
-        object_label do
-          "#{bindings[:object].name} - #{bindings[:object].league.name}"
+        object_label_method do
+          :custom_label_method
         end
       end
     end
-
-This would output "Team's name - Team's league's name" in all the places
-mentioned in paragraph above example.
+    
+    def Team<ActiveRecord::Base
+      def custom_label_method
+        "Team #{self.name}"
+      end
+    end
 
 *Difference between `label` and `object_label`*
 
@@ -243,35 +264,37 @@ evaluated at runtime.
 This will desactivate config.navigation.max_visible_tabs.
 
     RailsAdmin.config do |config|
+      ..
       config.model Team do
         parent League
       end
-    end
-
-    RailsAdmin.config do |config|
       config.model Division do
         parent League
       end
+      ..
     end
 
 Obtained navigation:
 
     Dashboard
     ...
-    League
+    League # (non-clickable)
+      League
       Division
       Team
     ...
 
-If you want a non-clickable root menu entry, add 'dropdown ENTRY_NAME' to your parent.
-Your parent will then be placed INSIDE his dropdown, in FIRST position.
+You probably want to change the name of the dropdown. 
+This can be easily achieved with the 'dropdown' attribute of the parent model.
 
 Added to previous example:
 
     RailsAdmin.config do |config|
+      ...
       config.model League do
         dropdown 'League related'
       end
+      ...
     end
 
 Obtained navigation:
@@ -290,7 +313,7 @@ By default, they are ordered by alphabetical order. If you need to override this
 a weight attribute. Default is 0. Lower values will bubble items to the left, higher values
 will move them to the right. Items with same weight will still be ordered by alphabetical order.
 The mecanism is fully compatible with dropdown menus. Items will be ordered within their own
-menu subset.
+menu subset. (but parent will always be first inside his submenu).
 
 Example:
 
@@ -302,6 +325,7 @@ Example:
     end
 
 The 'League related' dropdown menu will move to the leftmost position.
+
 
 ### List view ###
 
@@ -342,7 +366,7 @@ You can also configure it per model:
 
 By default, rows sorted by the field `id` in reverse order
 
-You can change default behavior with use two options: `sort_by` and `sort_reverse`
+You can change default behavior with use two options: `sort_by` and `sort_reverse?`
 
 **Default sorting - Configure globally**
 
@@ -350,7 +374,7 @@ You can change default behavior with use two options: `sort_by` and `sort_revers
       config.models do
         list do
           sort_by :updated_at
-          sort_reverse true
+          sort_reverse true # already default for serials ids and dates
         end
       end
     end
@@ -361,9 +385,121 @@ You can change default behavior with use two options: `sort_by` and `sort_revers
       config.model Player do
         list do
           sort_by :name
-          sort_reverse { false }
+          sort_reverse false
         end
       end
+    end
+
+**Fields - Sortability**
+
+You can make a column non-sortable by setting the sortable option to false (1)
+You can change the column that the field will actually sort on (2)
+Belongs_to associations : 
+  will be sorted on their label if label is not virtual (:name, :title, etc.)
+  otherwise on the foreign_key (:team_id)
+  you can also specify a column on the targetted table (see example) (3)
+
+
+    RailsAdmin.config do |config|
+      config.model Player do
+        list do
+          field :created_at do # (1)
+            sortable false
+          end
+          field :name do # (2)
+            sortable :last_name # imagine there is a :last_name column and that :name is virtual
+          end
+          field :team_id do # (3)
+            # Will order by players playing with the best teams, 
+            # rather than the team name (by default), 
+            # or the team id (dull but default if object_label is not a column name)
+            
+            sortable :win_percentage
+            
+            # if you need to specify the join association name: 
+            # (See #526 and http://api.rubyonrails.org/classes/ActiveRecord/Associations/ClassMethods.html => table_aliasing)
+            sortable {:teams => :win_percentage} 
+            # or
+            sortable "teams.win_percentage"
+          end
+        end
+      end
+    end
+
+Default sort column is :id for ActiveRecord version
+To change it:
+    RailsAdmin.config do |config|
+      config.model Team do
+        sort_by :name
+      end
+    end
+    
+By default, dates and serial ids are reversed when first-sorted ('desc' instead of 'asc' in SQL).
+If you want to reverse (or cancel it) the default sort order (first column click or the default sort column):
+
+    RailsAdmin.config do |config|
+      config.model Team do
+        list do
+          field :id do
+            sort_reverse? false   # will sort id increasing ('asc') first ones first (default is last ones first)
+          end
+          field :created_at do
+            sort_reverse? false   # will sort dates increasing ('asc') first ones first (default is last ones first)
+          end
+          field :name do
+            sort_reverse? true    # will sort name decreasing ('dec') z->a (default is a->z)
+          end
+        end
+      end
+    end
+
+**Fields - Searchability**
+
+You can make a column non-searchable by setting the searchable option to false (1)
+You can change the column that the field will actually search on (2)
+You can specify a list of column that will be searched over (3)
+Belongs_to associations : 
+  will be searched on their foreign_key (:team_id)
+  or on their label if label is not virtual (:name, :title, etc.)
+  you can also specify columns on the targetted table or the source table (see example) (4)
+
+    RailsAdmin.config do |config|
+      config.model Player do
+        list do
+          field :created_at do # (1)
+            searchable false
+          end 
+          
+          field :name do (2)
+            searchable :last_name
+          end
+          # OR
+          field :name do (3)
+            searchable [:first_name, :last_name]
+          end
+          
+          field :team_id do # (4)
+            searchable [:name, :id]
+            # eq. to [Team => :name, Team => :id] 
+            # or even [:name, Player => :team_id] will search on teams.name and players.team_id
+          
+            # if you need to specify the join association name: 
+            # (See #526 and http://api.rubyonrails.org/classes/ActiveRecord/Associations/ClassMethods.html => table_aliasing)
+            searchable [:teams => :name, :teams => :id]
+            # or
+            searchable ["teams.name", "teams.id"]
+          end
+        end
+      end
+    end
+
+Searchable definitions will be used for searches and filters.
+You can independently desactivate querying (search) or filtering for each field with:
+
+    field :team do
+      searchable [:name, :color]
+      queryable? true # default
+      filterable? false
     end
 
 **Fields - Visibility and ordering**
@@ -490,21 +626,6 @@ options are defined for a single field, `strftime_format` has precedence over
 `date_format` option. For more information about localizing Rails see
 [Rails Internationalization API](http://edgeguides.rubyonrails.org/i18n.html#adding-date-time-formats)
 and [Rails I18n repository](https://github.com/svenfuchs/rails-i18n/tree/master/rails/locale).
-
-**Fields - Sortability**
-
-You can make a column non-sortable by setting the sortable option to false:
-
-    RailsAdmin.config do |config|
-      config.model Team do
-        list do
-          field :name
-          field :created_at do
-            sortable false
-          end
-        end
-      end
-    end
 
 **Fields - Column CSS class**
 
@@ -825,15 +946,39 @@ Everything can be overridden with `help`:
       end
     end
 
+**Fields - Paperclip**
+    
+    class Team < ActiveRecord::Base
+      has_attached_file :image, :styles => { :medium => "300x300>", :thumb => "100x100>" }
+  
+      # handling delete in your model, if needed. Replace all image occurences with your asset name.
+      attr_accessor :delete_image
+      before_save { self.image = nil if self.delete_image == '1' }
+    end
+    
+    RailsAdmin.config do |config|
+      config.model Team do
+        edit do
+          field :image do
+            thumb_method :thumb # for images. Will default to full size image, which might break the layout
+            delete_method :delete_image # actually not needed in this case: default is "delete_#{field_name}" if the object responds to it
+          end
+        end
+      end
+    end
+    
 **Fields - Enum**
 
-Fields of datatype string, integer, text can be rendered with select boxes, if object responds to `method_enum`.
+Fields of datatype string, integer, text can be rendered with select boxes. Auto-detected if object responds to `#{method_name}_enum`.
+You can use `enum_method` to indicate the name of the enumeration method in your model.
+You can use `enum` to override any `enum_method` and give back a `FormOptionsHelper#options_for_select` collection.
 
     class Team < ActiveRecord::Base
       ...
       def color_enum
-        self.team.available_color_choices
-        # return collection like ["blue", "yellow", "red"] or [["blue", 1], ["yellow", 2], ["red", 3]]
+        [['blue', 'red'], 'red']
+        # should return any collection accepted by `FormOptionsHelper#options_for_select`
+        # See http://api.rubyonrails.org/classes/ActionView/Helpers/FormOptionsHelper.html#method-i-options_for_select
       end
       ...
     end
@@ -841,13 +986,26 @@ Fields of datatype string, integer, text can be rendered with select boxes, if o
     RailsAdmin.config do |config|
       config.model Team do
         edit do
-          field :name
           field :color
-          field :created_at do
-            date_format :short
-          end
-          field :updated_at do
-            strftime_format "%Y-%m-%d"
+          # defaults to 
+          # field :color, :enum do
+          #   enum_method do
+          #     :color_enum
+          #   end
+          # end
+        end
+      end
+    end
+    
+If you don't have any enumeration method in your model, this will work:
+
+    RailsAdmin.config do |config|
+      config.model Team do
+        edit do
+          field :color, :enum do
+            enum do
+              ['green', 'white']
+            end
           end
         end
       end
@@ -883,6 +1041,81 @@ RailsAdmin will handle ordering in and out of the form.
     end
 
 You'll need to handle ordering in your model with a position column for example.
+
+
+### Configuring fields ###
+
+* exclude_fields field_list
+* exclude_fields_if cond
+* include_fields field_list
+* include_fields_if cond
+* include_all_fields
+* fields field_list,  configuration_block
+
+
+** Fields - exclude some fields **
+
+By default *all* fields found on your model will be added to list/edit/export views,
+with a few exceptions for polymorphic columns and such.
+You can exclude specific fields with exclude_fields & exclude_fields_if:
+
+Example:
+
+    RailsAdmin.config do |config|
+      config.model League do
+        list do
+          exclude_fields_if do
+            type == :datetime
+          end
+
+          exclude_fields :id, :name     
+        end
+      end
+    end
+
+But after you specify your *first* field, this behaviour will be canceled.
+*Only* the specified fields will be added.
+But you can then use include_all_fields to add all default fields:
+
+Example:
+
+    RailsAdmin.config do |config|
+      config.model League do
+        list do
+          field :name do
+            # snipped specific configuration for name attribute
+          end
+          
+          include_all_fields # all other default fields will be added after, conveniently
+          exclude_fields :created_at # but you still can remove fields
+        end
+      end
+    end
+
+** Fields - include some fields **
+
+It is also possible to add fields by group and configure them by batches:
+
+Example:
+
+    RailsAdmin.config do |config|
+      config.model League do
+        list do
+          # all selected fields will be added, but you can't configure them. 
+          # If you need to select them by type, see *fields_of_type*
+          include_fields_if do
+            name =~ /displayed/
+          end
+          
+          include_fields :name, :title                # simply adding fields by their names (order will be maintained)
+          fields :created_at, :updated_at do          # adding and configuring
+            label do
+              "#{label} (timestamp)"
+            end
+          end
+        end
+      end
+    end
 
 ### Mass Assignment Operations ###
 
@@ -981,6 +1214,34 @@ with [CanCan](https://github.com/ryanb/cancan), pass it like this.
     RailsAdmin.authorize_with :cancan
 
 See the [wiki](https://github.com/sferik/rails_admin/wiki) for more on authorization.
+
+Static Assets & Locales
+-----------------------
+
+When running `rake rails_admin:install` the locale files (`config/locales/...`) and the static asset files
+(javascript files, images, stylesheets) are copied to your local application tree.
+
+Should you update the gem to a new version that perhaps includes updated locale or asset files, then you won't automatically
+be able to take advantage of these. In fact, you may choose for this reason, to not commit locale files and asset
+files to your local repository and instead have them loaded from the gem.
+
+You can choose to commit locale files to your local application tree, if you want to modify them from what the gem
+supplies; then you also need to manage updates by hand. Locale files will be automatically loaded from the gem
+unless overrides exist.
+
+For asset files, the following applies: When running in development mode, the rails_admin engine will inject a middleware
+to serve static assets (javascript files, images, stylesheets) from the gem's location. This generally isn't a good
+setup for high-traffic production environments. Depending on your web server configuration is may also just plain fail.
+You may need to serve the asset files from the local application tree (public/...). You can choose to have the assets
+served from the gem in development mode but from the local application tree in production mode. In that case, you
+need to copy the assets during deployment (e.g. via a capistrano hook).
+
+Two rake tasks have been provided to copy locale and asset files to the local application tree:
+
+    rake rails_admin:copy_locales
+    rake rails_admin:copy_assets
+
+These tasks run automatically during installation, but are provided separately, e.g. for updates or deployments.
 
 Contributing
 ------------

@@ -42,7 +42,7 @@ describe RailsAdmin do
         options = nil
         proc    = RailsAdmin.authorize_with(:example, options)
 
-        mock(ExampleModule::AuthorizationAdapter).new(RailsAdmin)
+        ExampleModule::AuthorizationAdapter.should_receive(:new).with(RailsAdmin)
         proc.call
       end
 
@@ -50,7 +50,7 @@ describe RailsAdmin do
         options = { :option => true }
         proc    = RailsAdmin.authorize_with(:example, options)
 
-        mock(ExampleModule::AuthorizationAdapter).new(RailsAdmin, options)
+        ExampleModule::AuthorizationAdapter.should_receive(:new).with(RailsAdmin, options)
         proc.call
       end
     end
@@ -65,7 +65,7 @@ describe RailsAdmin do
       end
 
       it "initializes configuration adapter" do
-        mock(ExampleModule::ConfigurationAdapter).new
+        ExampleModule::ConfigurationAdapter.should_receive(:new)
         RailsAdmin.configure_with(:example)
       end
 
@@ -76,6 +76,36 @@ describe RailsAdmin do
           configurator = config
         end
         configurator.should be_a(ExampleModule::ConfigurationAdapter)
+      end
+    end
+  end
+
+  describe ".config" do
+    context ".default_search_operator" do
+      around(:each) do |example|
+        old_search_operator = RailsAdmin::Config.default_search_operator
+        example.run
+        RailsAdmin::Config.default_search_operator = old_search_operator
+      end
+
+      it "sets the default_search_operator" do
+        RailsAdmin.config do |config|
+          config.default_search_operator = 'starts_with'
+        end
+
+        RailsAdmin::Config.default_search_operator.should == 'starts_with'
+      end
+
+      it "errors on unrecognized search operator" do
+        expect do
+          RailsAdmin.config do |config|
+            config.default_search_operator = 'random'
+          end
+        end.to raise_error(ArgumentError, "Search operator 'random' not supported")
+      end
+
+      it "defaults to 'default'" do
+        RailsAdmin::Config.default_search_operator.should == 'default'
       end
     end
   end

@@ -5,18 +5,24 @@ module RailsAdmin
   module Config
     module Fields
       class Association < RailsAdmin::Config::Fields::Base
-
+        
         def self.inherited(klass)
-            klass.instance_variable_set("@searchable", false)
-            klass.instance_variable_set("@sortable", false)
-            super(klass)
+          super(klass)
         end
 
         # Reader for the association information hash
         def association
           @properties
         end
-
+        
+        register_instance_option(:sortable) do
+          false
+        end
+        
+        register_instance_option(:searchable) do
+          false
+        end
+        
         # Accessor whether association is visible or not. By default
         # association checks whether the child model is excluded in
         # configuration or not.
@@ -26,9 +32,10 @@ module RailsAdmin
 
         # Reader for a collection of association's child models in an array of
         # [label, id] arrays.
-        def associated_collection
-          associated_model_config.abstract_model.all.map do |object|
-            [associated_model_config.with(:object => object).object_label, object.id]
+        def associated_collection(authorization_adapter)
+          scope = authorization_adapter && authorization_adapter.query(:list, associated_model_config.abstract_model)
+          associated_model_config.abstract_model.all({}, scope).map do |object|
+            [object.send(associated_model_config.object_label_method), object.id]
           end
         end
 

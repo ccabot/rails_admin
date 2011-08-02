@@ -5,12 +5,15 @@ require 'rails_admin/abstract_object'
 module RailsAdmin
   module Adapters
     module ActiveRecord
+      DISABLED_COLUMN_TYPES = [:tsvector]
+
       def self.extended(abstract_model)
         
         # ActiveRecord does not handle has_one relationships the way it does for has_many, 
         # and does not create any association_id and association_id= methods. 
         # Added here for backward compatibility after a refactoring, but it does belong to ActiveRecord IMO.
         # Support is hackish at best. Atomicity is respected for creation, but not while updating.
+        # It means a failed validation at update on the parent object could still modify target belongs_to foreign ids.
         abstract_model.model.reflect_on_all_associations.select{|assoc| assoc.macro.to_s == 'has_one'}.each do |association|
           abstract_model.model.send(:define_method, "#{association.name}_id") do
             self.send(association.name).try(:id)
@@ -141,7 +144,8 @@ module RailsAdmin
       end
 
       def properties
-        model.columns.map do |property|
+        columns = model.columns.reject {|c| DISABLED_COLUMN_TYPES.include?(c.type.to_sym) }
+        columns.map do |property|
           {
             :name => property.name.to_sym,
             :pretty_name => property.name.to_s.tr('_', ' ').capitalize,
